@@ -7,3 +7,6 @@ chmod +x ./download-core.sh
 yarn install
 
 docker compose up -d
+
+Check data được tạo trong DB mongo
+node checkData.js
