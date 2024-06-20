@@ -163,7 +163,7 @@ export default function (
     });
 
     router.get('/', async (req: IRequestWithUser, res) => {
-        let contentObjects: any[];
+        let contentObjects;
         try {
             const contentIds = await h5pEditor.contentManager.listContent(
                 req.user
