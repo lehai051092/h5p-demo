@@ -2,7 +2,6 @@ import { caching } from 'cache-manager';
 import redisStore from 'cache-manager-redis-store';
 import ioredis from 'ioredis';
 import type { Db } from 'mongodb';
-
 import * as H5P from '@lumieducation/h5p-server';
 import * as dbImplementations from '@lumieducation/h5p-mongos3';
 import RedisLockProvider from '@lumieducation/h5p-redis-lock';

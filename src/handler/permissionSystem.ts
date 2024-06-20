@@ -6,7 +6,7 @@ import {
     UserDataPermission
 } from '@lumieducation/h5p-server';
 
-import User from './User';
+import User from '../obj/user';
 
 export default class PermissionSystem
     implements IPermissionSystem<User>

@@ -18,74 +18,55 @@ import {
 } from '@lumieducation/h5p-express';
 
 import * as H5P from '@lumieducation/h5p-server';
-import restExpressRoutes from './routes';
-import User from './User';
-import createH5PEditor from './createH5PEditor';
-import { displayIps, clearTempFiles } from './utils';
-import PermissionSystem from './permissionSystem';
+import restExpressRoutes from './routes/h5p';
+import User from './obj/user';
+import createH5PEditor from './handler/createH5PEditor';
+import { displayIps, clearTempFiles } from './handler/utils';
+import PermissionSystem from './handler/permissionSystem';
+import connectDB from "./database";
+import UserM, { IUserModel } from './models/userModel';
 
 let tmpDir: DirectoryResult;
 
-const userTable = {
-    teacher1: {
-        username: 'teacher1',
-        name: 'Teacher 1',
-        email: 'teacher1@example.com',
-        role: 'teacher'
-    },
-    teacher2: {
-        username: 'teacher2',
-        name: 'Teacher 2',
-        email: 'teacher2@example.com',
-        role: 'teacher'
-    },
-    student1: {
-        username: 'student1',
-        name: 'Student 1',
-        email: 'student1@example.com',
-        role: 'student'
-    },
-    student2: {
-        username: 'student2',
-        name: 'Student 2',
-        email: 'student2@example.com',
-        role: 'student'
-    },
-    admin: {
-        username: 'admin',
-        name: 'Administration',
-        email: 'admin@example.com',
-        role: 'admin'
-    },
-    anonymous: {
-        username: 'anonymous',
-        name: 'Anonymous',
-        email: '',
-        role: 'anonymous'
-    }
-};
+connectDB();
 
 const initPassport = (): void => {
     passport.use(
-        new LocalStrategy((username, password, callback) => {
-            // We don't check the password. In a real application you'll perform
-            // DB access here.
-            const user = userTable[username];
-            if (!user) {
-                callback('User not found in user table');
-            } else {
+        new LocalStrategy(async (username, password, callback) => {
+            try {
+                let user: IUserModel | null = await UserM.findOne({ username });
+                if (!user) {
+                    // Tạo mới user nếu không tồn tại
+                    user = new UserM({
+                        username: username,
+                        name: username,
+                        email: `${username}@example.com`,
+                        role: 'student'
+                    }) as any;
+                    await user.save();
+                }
+                // Bạn có thể thêm logic kiểm tra mật khẩu tại đây nếu cần
                 callback(null, user);
+            } catch (err) {
+                callback(err);
             }
         })
     );
-    passport.serializeUser((user, done): void => {
-        done(null, user);
+
+    passport.serializeUser((user: IUserModel, done): void => {
+        done(null, user.id);
     });
 
-    passport.deserializeUser((user, done): void => {
-        done(null, user);
+    passport.deserializeUser(async (id, done) => {
+        try {
+            const user = await UserM.findById(id);
+            done(null, user);
+        } catch (err) {
+            done(err);
+        }
     });
 };
+
 
 const addCsrfTokenToUser = (req, res, next): void => {
     (req.user as any).csrfToken = req.csrfToken;
@@ -353,26 +334,26 @@ const start = async (): Promise<void> => {
     server.post(
         '/login',
         passport.authenticate('local', {
-            failWithError: true
+            failWithError: true,
         }),
         csurf({
-            // We need csurf to get the token for the current session, but we
-            // don't want to protect the current route, as the login can't have
-            // a CSRF token.
-            ignoreMethods: ['POST']
+            ignoreMethods: ['POST'],
         }),
-        function (
-            req: express.Request & {
-                user: { username: string; email: string; name: string };
-            },
-            res: express.Response
-        ): void {
-            res.status(200).json({
-                username: req.user.username,
-                email: req.user.email,
-                name: req.user.name,
-                csrfToken: req.csrfToken()
-            });
+        async function (req: any, res: any): Promise<void> {
+            try {
+                const user = await UserM.findOne({ username: req.user.username });
+                if (!user) {
+                    return res.status(400).json({ message: 'User not found' });
+                }
+                res.status(200).json({
+                    username: user.username,
+                    email: user.email,
+                    name: user.name,
+                    csrfToken: req.csrfToken(),
+                });
+            } catch (err) {
+                res.status(500).json({ message: err.message });
+            }
         }
     );
 
